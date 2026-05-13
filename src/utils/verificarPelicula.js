@@ -1,17 +1,21 @@
-const pool = require('../config/db')
+const prisma = require('../config/prisma')
 const AppError = require('./AppError')
 
 const verificarPeliculaExiste = async (peliculaId) => {
-  const result = await pool.query(
-    'SELECT id FROM peliculas WHERE id = $1',
-    [peliculaId]
-  )
+  const pelicula = await prisma.pelicula.findUnique({
+    where: {
+      id: Number(peliculaId)
+    },
+    select: {
+      id: true
+    }
+  })
 
-  if (result.rows.length === 0) {
+  if (!pelicula) {
     throw new AppError('Película no encontrada', 404)
   }
 
-  return result.rows[0]
+  return pelicula
 }
 
 module.exports = verificarPeliculaExiste

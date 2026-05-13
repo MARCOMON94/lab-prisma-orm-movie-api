@@ -1,4 +1,4 @@
-const pool = require('../config/db')
+const prisma = require('../config/prisma')
 const AppError = require('../utils/AppError')
 const verificarPeliculaExiste = require('../utils/verificarPelicula')
 
@@ -10,19 +10,19 @@ const añadirFavorito = async (req, res, next) => {
     await verificarPeliculaExiste(peliculaId)
 
     try {
-      const { rows } = await pool.query(
-        `INSERT INTO favoritos (usuario_id, pelicula_id)
-         VALUES ($1, $2)
-         RETURNING *`,
-        [usuarioId, peliculaId]
-      )
+      const favorito = await prisma.favorito.create({
+        data: {
+          usuarioId,
+          peliculaId
+        }
+      })
 
       res.status(201).json({
         ok: true,
-        favorito: rows[0]
+        favorito
       })
     } catch (err) {
-      if (err.code === '23505') {
+      if (err.code === 'P2002') {
         throw new AppError('Esta película ya está en tus favoritos', 409)
       }
 
@@ -38,16 +38,27 @@ const quitarFavorito = async (req, res, next) => {
     const peliculaId = Number(req.params.peliculaId)
     const usuarioId = req.usuario.id
 
-    const { rowCount } = await pool.query(
-      `DELETE FROM favoritos
-       WHERE usuario_id = $1
-       AND pelicula_id = $2`,
-      [usuarioId, peliculaId]
-    )
+    const favorito = await prisma.favorito.findUnique({
+      where: {
+        usuarioId_peliculaId: {
+          usuarioId,
+          peliculaId
+        }
+      }
+    })
 
-    if (rowCount === 0) {
+    if (!favorito) {
       throw new AppError('Favorito no encontrado', 404)
     }
+
+    await prisma.favorito.delete({
+      where: {
+        usuarioId_peliculaId: {
+          usuarioId,
+          peliculaId
+        }
+      }
+    })
 
     res.json({
       ok: true,
@@ -62,21 +73,34 @@ const listarFavoritos = async (req, res, next) => {
   try {
     const usuarioId = req.usuario.id
 
-    const { rows } = await pool.query(
-      `SELECT
-        p.id,
-        p.titulo,
-        p.anio,
-        p.nota,
-        f.created_at AS añadido_en
-       FROM favoritos f
-       JOIN peliculas p ON p.id = f.pelicula_id
-       WHERE f.usuario_id = $1
-       ORDER BY f.created_at DESC`,
-      [usuarioId]
-    )
+    const favoritos = await prisma.favorito.findMany({
+      where: {
+        usuarioId
+      },
+      include: {
+        pelicula: {
+          select: {
+            id: true,
+            titulo: true,
+            anio: true,
+            nota: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    })
 
-    res.json(rows)
+    const respuesta = favoritos.map((favorito) => ({
+      id: favorito.pelicula.id,
+      titulo: favorito.pelicula.titulo,
+      anio: favorito.pelicula.anio,
+      nota: favorito.pelicula.nota,
+      añadido_en: favorito.createdAt
+    }))
+
+    res.json(respuesta)
   } catch (err) {
     next(err)
   }

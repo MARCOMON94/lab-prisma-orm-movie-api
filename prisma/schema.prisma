@@ -42,18 +42,19 @@ model Genero {
 }
 
 model Pelicula {
-  id         Int      @id @default(autoincrement())
-  titulo     String   @db.VarChar(255)
+  id         Int        @id @default(autoincrement())
+  titulo     String     @db.VarChar(255)
   anio       Int?
-  nota       Decimal? @db.Decimal(3, 1)
-  directorId Int?     @map("director_id")
-  generoId   Int?     @map("genero_id")
-  createdAt  DateTime @default(now()) @map("created_at")
+  nota       Decimal?   @db.Decimal(3, 1)
+  directorId Int?       @map("director_id")
+  generoId   Int?       @map("genero_id")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  destacada  Boolean    @default(false)
 
-  director  Director?  @relation(fields: [directorId], references: [id])
-  genero    Genero?    @relation(fields: [generoId], references: [id])
-  resenas   Resena[]
-  favoritos Favorito[]
+  director   Director?  @relation(fields: [directorId], references: [id])
+  genero     Genero?    @relation(fields: [generoId], references: [id])
+  resenas    Resena[]
+  favoritos  Favorito[]
 
   @@map("peliculas")
 }

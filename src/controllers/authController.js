@@ -1,6 +1,6 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
-const pool = require('../config/db')
+const prisma = require('../config/prisma')
 const AppError = require('../utils/AppError')
 
 const SALT_ROUNDS = 10
@@ -33,32 +33,37 @@ const registro = async (req, res, next) => {
 
     const emailNormalizado = email.toLowerCase()
 
-    const usuarioExistente = await pool.query(
-      'SELECT id FROM usuarios WHERE email = $1',
-      [emailNormalizado]
-    )
+    const usuarioExistente = await prisma.usuario.findUnique({
+      where: {
+        email: emailNormalizado
+      }
+    })
 
-    if (usuarioExistente.rows.length > 0) {
+    if (usuarioExistente) {
       throw new AppError('Ya existe un usuario con ese email', 409)
     }
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS)
 
-    const rolFinal = rol === 'admin' ? 'admin' : 'usuario'
-
-    const resultado = await pool.query(
-      `INSERT INTO usuarios (nombre, email, password_hash, rol)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, nombre, email, rol, created_at`,
-      [nombre, emailNormalizado, passwordHash, rolFinal]
-    )
-
-    const usuario = resultado.rows[0]
-    const token = generarToken(usuario)
+    const usuario = await prisma.usuario.create({
+      data: {
+        nombre,
+        email: emailNormalizado,
+        passwordHash,
+        rol: rol === 'admin' ? 'admin' : 'usuario'
+      },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        rol: true,
+        createdAt: true
+      }
+    })
 
     res.status(201).json({
       mensaje: 'Usuario registrado correctamente',
-      token,
+      token: generarToken(usuario),
       usuario
     })
   } catch (err) {
@@ -76,28 +81,26 @@ const login = async (req, res, next) => {
 
     const emailNormalizado = email.toLowerCase()
 
-    const resultado = await pool.query(
-      'SELECT * FROM usuarios WHERE email = $1 AND activo = true',
-      [emailNormalizado]
-    )
+    const usuario = await prisma.usuario.findFirst({
+      where: {
+        email: emailNormalizado,
+        activo: true
+      }
+    })
 
-    if (resultado.rows.length === 0) {
+    if (!usuario) {
       throw new AppError('Credenciales incorrectas', 401)
     }
 
-    const usuario = resultado.rows[0]
-
-    const passwordValida = await bcrypt.compare(password, usuario.password_hash)
+    const passwordValida = await bcrypt.compare(password, usuario.passwordHash)
 
     if (!passwordValida) {
       throw new AppError('Credenciales incorrectas', 401)
     }
 
-    const token = generarToken(usuario)
-
     res.json({
       mensaje: 'Login correcto',
-      token,
+      token: generarToken(usuario),
       usuario: {
         id: usuario.id,
         nombre: usuario.nombre,
@@ -112,18 +115,24 @@ const login = async (req, res, next) => {
 
 const perfil = async (req, res, next) => {
   try {
-    const resultado = await pool.query(
-      `SELECT id, nombre, email, rol, created_at
-       FROM usuarios
-       WHERE id = $1`,
-      [req.usuario.id]
-    )
+    const usuario = await prisma.usuario.findUnique({
+      where: {
+        id: req.usuario.id
+      },
+      select: {
+        id: true,
+        nombre: true,
+        email: true,
+        rol: true,
+        createdAt: true
+      }
+    })
 
-    if (resultado.rows.length === 0) {
+    if (!usuario) {
       throw new AppError('Usuario no encontrado', 404)
     }
 
-    res.json(resultado.rows[0])
+    res.json(usuario)
   } catch (err) {
     next(err)
   }

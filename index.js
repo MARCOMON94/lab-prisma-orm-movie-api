@@ -4,7 +4,7 @@ const express = require('express')
 
 const peliculasRouter = require('./src/routes/peliculas')
 const authRouter = require('./src/routes/auth')
-const estadisticasRouter = require('./src/routes/estadisticas')
+//const estadisticasRouter = require('./src/routes/estadisticas')
 const errorHandler = require('./src/middleware/errorHandler')
 const favoritosRouter = require('./src/routes/favoritos')
 
@@ -15,7 +15,7 @@ app.use(express.json())
 
 app.use('/api/auth', authRouter)
 app.use('/api/peliculas', peliculasRouter)
-app.use('/api/estadisticas', estadisticasRouter)
+//app.use('/api/estadisticas', estadisticasRouter)
 app.use('/api/favoritos', favoritosRouter)
 
 app.get('/', (req, res) => {
